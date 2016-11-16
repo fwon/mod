@@ -4,6 +4,8 @@
  * ver: 1.0.13
  * update: 2016/01/27
  * https://github.com/fex-team/mod
+ *
+ * Modified by fwon, 添加require.defineCss
  */
 var require;
 
@@ -74,14 +76,13 @@ var define;
         }
 
         head.appendChild(docFrag);
+        
     };
 
     var loadScripts = function(ids, callback, onerror){
         var queues = [];
         for(var i = 0, len = ids.length; i < len; i++){
             var id = ids[i];
-            var queue = loadingMap[id] || (loadingMap[id] = []);
-            queue.push(callback);
 
             //
             // resource map query
@@ -96,6 +97,13 @@ var define;
             else {
                 url = res.url || res.uri || id;
             }
+
+            if (res.extras && res.extras.moduleId) {
+                id = res.extras.moduleId;
+            }
+
+            var queue = loadingMap[id] || (loadingMap[id] = []);
+            queue.push(callback);
 
             queues.push({
                 id: id,
@@ -127,7 +135,7 @@ var define;
         }
 
         id = require.alias(id);
-
+        
         var mod = modulesMap[id];
         if (mod) {
             return mod.exports;
@@ -167,7 +175,7 @@ var define;
         var needLoad = [];
 
         function findNeed(depArr) {
-            var child;
+            var child, id;
 
             for (var i = 0, n = depArr.length; i < n; i++) {
                 //
@@ -175,15 +183,20 @@ var define;
                 //
                 var dep = require.alias(depArr[i]);
 
-                if (dep in needMap) {
+                child = resMap[dep] || resMap[dep + '.js'];
+                if (child.extras && child.extras.moduleId) {
+                    id = child.extras.moduleId;
+                }
+
+                if (id in needMap) {
                     continue;
                 }
 
-                needMap[dep] = true;
+                needMap[id] = true;
 
-                if (dep in factoryMap) {
+                if (id in factoryMap) {
                     // check whether loaded resource's deps is loaded or not
-                    child = resMap[dep] || resMap[dep + '.js'];
+                    // child = resMap[dep] || resMap[dep + '.js'];
                     if (child && 'deps' in child) {
                         findNeed(child.deps);
                     }
@@ -193,7 +206,7 @@ var define;
                 needLoad.push(dep);
                 needNum++;
 
-                child = resMap[dep] || resMap[dep + '.js'];
+                // child = resMap[dep] || resMap[dep + '.js'];
                 if (child && 'deps' in child) {
                     findNeed(child.deps);
                 }
@@ -277,6 +290,16 @@ var define;
         }
     };
 
+    //ADD 根据css id加载css
+    require.defineCss = function(id) {
+        var res = resMap[id] || resMap[id + '.less'] || resMap[id + '.css'];
+        if (res) {
+            var uri = res.uri;
+            require.loadCss({
+                url: uri
+            });
+        }
+    };
 
     require.alias = function (id) {
         return id.replace(/\.js$/i, '');
